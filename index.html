@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Color Mix Match</title>
+<style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+        font-family: "Trebuchet MS", "Comic Sans MS", Verdana, sans-serif;
+        background: linear-gradient(160deg, #fff8e1 0%, #e3f2fd 55%, #f3e5f5 100%);
+        min-height: 100vh;
+        color: #333;
+        padding: 12px;
+    }
+    .wrap { max-width: 860px; margin: 0 auto; }
+    header { text-align: center; padding: 10px 0 4px; }
+    h1 { font-size: 2.1em; color: #6a1b9a; letter-spacing: 1px; }
+    h1 .dot { display: inline-block; width: 18px; height: 18px; border-radius: 50%; vertical-align: middle; margin: 0 2px; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+    .tagline { color: #666; margin-top: 2px; font-size: 1em; }
+    .howto {
+        background: #fff; border: 2px dashed #ffb300; border-radius: 12px;
+        padding: 8px 14px; margin: 10px 0; text-align: center; font-size: 0.98em;
+    }
+    .levels { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 10px 0; }
+    .lvl {
+        width: 52px; height: 52px; font-size: 26px; border-radius: 12px;
+        border: 3px solid #ddd; background: #fff; cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        position: relative;
+    }
+    .lvl small {
+        position: absolute; bottom: 1px; right: 4px; font-size: 10px; color: #888;
+    }
+    .lvl.active { border-color: #6a1b9a; box-shadow: 0 0 0 3px #ce93d8; }
+    .lvl.passed { border-color: #43a047; background: #e8f5e9; }
+    .lvl.passed::after { content: "★"; position: absolute; top: -2px; right: 2px; font-size: 13px; color: #43a047; }
+    .lvl.locked { opacity: 0.45; cursor: not-allowed; }
+    .stage {
+        background: #fff; border-radius: 16px; padding: 14px;
+        box-shadow: 0 4px 14px rgba(0,0,0,.12);
+    }
+    .target-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; justify-content: center; }
+    .target-card { text-align: center; }
+    .target-emoji { font-size: 74px; line-height: 1; }
+    .target-name { font-size: 1.25em; font-weight: bold; margin-top: 4px; }
+    .target-level { color: #888; font-size: 0.9em; }
+    .discs { display: flex; gap: 18px; align-items: center; }
+    .disc-box { text-align: center; }
+    .disc {
+        width: 92px; height: 92px; border-radius: 50%;
+        border: 4px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,.25);
+        margin: 0 auto 4px;
+    }
+    .disc-label { font-size: 0.85em; color: #666; }
+    .hex { font-family: monospace; font-size: 0.85em; color: #888; }
+    .vs { font-size: 1.6em; font-weight: bold; color: #999; }
+    canvas {
+        display: block; width: 100%; height: 300px; margin: 14px 0 8px;
+        background: #fff; border: 3px solid #b39ddb; border-radius: 14px;
+        touch-action: none; cursor: crosshair;
+    }
+    .canvas-hint { text-align: center; color: #999; font-size: 0.9em; margin-bottom: 6px; }
+    .palette { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 8px 0; }
+    .paint {
+        border: 3px solid transparent; border-radius: 12px; background: #fff;
+        padding: 4px 6px 5px; cursor: pointer; width: 74px;
+        box-shadow: 0 1px 4px rgba(0,0,0,.15);
+    }
+    .paint .swatch { height: 30px; border-radius: 8px; border: 1px solid rgba(0,0,0,.15); }
+    .paint .pname { font-size: 0.72em; margin-top: 3px; line-height: 1.1; }
+    .paint.selected { border-color: #333; transform: scale(1.07); box-shadow: 0 3px 8px rgba(0,0,0,.25); }
+    .actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 12px; }
+    button.big {
+        font-family: inherit; font-size: 1.1em; font-weight: bold;
+        padding: 10px 22px; border: none; border-radius: 999px; cursor: pointer;
+        box-shadow: 0 2px 5px rgba(0,0,0,.2);
+    }
+    #checkBtn { background: #43a047; color: #fff; }
+    #clearBtn { background: #ef5350; color: #fff; }
+    #hintBtn { background: #ffb300; color: #4e342e; }
+    #nextBtn { background: #6a1b9a; color: #fff; display: none; }
+    button.big:disabled { opacity: 0.5; cursor: not-allowed; }
+    .hint { text-align: center; color: #6d4c41; font-style: italic; margin-top: 8px; min-height: 1.2em; }
+    .result {
+        display: none; text-align: center; margin-top: 14px; padding: 14px;
+        border-radius: 14px; background: #f3e5f5;
+    }
+    .result.show { display: block; }
+    .result .pct { font-size: 3em; font-weight: bold; color: #6a1b9a; line-height: 1; }
+    .result .verdict { font-size: 1.25em; font-weight: bold; margin-top: 4px; }
+    .result .compare { display: flex; gap: 20px; justify-content: center; margin-top: 12px; align-items: center; }
+    .result .compare .disc { width: 74px; height: 74px; }
+    .result .note { color: #666; margin-top: 8px; }
+    footer { text-align: center; color: #999; font-size: 0.8em; margin: 16px 0 6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+    <header>
+        <h1><span class="dot" style="background:#e53935"></span>Color Mix Match<span class="dot" style="background:#1e88e5"></span></h1>
+        <p class="tagline">Mix paint to match the color!</p>
+    </header>
+
+    <div class="howto">🎨 Pick a paint, drag on the canvas to mix it in, then press <b>Check</b>. You need <b>90%</b> to pass!</div>
+
+    <div class="levels" id="levels"></div>
+
+    <div class="stage">
+        <div class="target-row">
+            <div class="target-card">
+                <div class="target-emoji" id="targetEmoji">🍅</div>
+                <div class="target-name" id="targetName">Tomato</div>
+                <div class="target-level" id="targetLevel">Level 1 of 12</div>
+            </div>
+            <div class="discs">
+                <div class="disc-box">
+                    <div class="disc" id="targetDisc" style="background:#B71C1C"></div>
+                    <div class="disc-label">Target color</div>
+                </div>
+                <div class="vs">VS</div>
+                <div class="disc-box">
+                    <div class="disc" id="mixDisc" style="background:#ffffff"></div>
+                    <div class="disc-label">Your mix</div>
+                    <div class="hex" id="mixHex">paint to start</div>
+                </div>
+            </div>
+        </div>
+
+        <canvas id="canvas" width="640" height="300" aria-label="Mixing canvas. Drag to paint."></canvas>
+        <div class="canvas-hint">Paint here. Each stroke mixes more of the selected paint into your color.</div>
+
+        <div class="palette" id="palette"></div>
+
+        <div class="actions">
+            <button class="big" id="checkBtn">✓ Check my color</button>
+            <button class="big" id="clearBtn">↺ Start over</button>
+            <button class="big" id="hintBtn">💡 Hint</button>
+            <button class="big" id="nextBtn">Next object →</button>
+        </div>
+        <div class="hint" id="hintText"></div>
+
+        <div class="result" id="result">
+            <div class="pct" id="resultPct">0%</div>
+            <div class="verdict" id="resultVerdict"></div>
+            <div class="compare" id="resultCompare"></div>
+            <div class="note" id="resultNote"></div>
+        </div>
+    </div>
+
+    <footer>An original game made for class. Mix, match and learn color theory!</footer>
+</div>
+
+<script>
+"use strict";
+
+// ---------- Data (original game, own colors and names) ----------
+var PAINTS = [
+    { name: "Snow White",   hex: "#FFFFFF" },
+    { name: "Midnight",     hex: "#212121" },
+    { name: "Cherry Pop",   hex: "#E53935" },
+    { name: "Sunny Side",   hex: "#FDD835" },
+    { name: "Lemon Zest",   hex: "#FFEA00" },
+    { name: "Ocean Splash", hex: "#1E88E5" },
+    { name: "Leafy",        hex: "#43A047" },
+    { name: "Juicy Orange", hex: "#FB8C00" },
+    { name: "Grape Soda",   hex: "#8E24AA" },
+    { name: "Bubblegum",    hex: "#EC407A" },
+    { name: "Choco Mud",    hex: "#6D4C41" }
+];
+
+var LEVELS = [
+    { emoji: "🍅", name: "Tomato",     target: "#B71C1C", hint: "Try Cherry Pop with a touch of Midnight." },
+    { emoji: "🍋", name: "Lemon",      target: "#E5BE00", hint: "Try Lemon Zest with a touch of Juicy Orange." },
+    { emoji: "🍊", name: "Orange",     target: "#E65100", hint: "Try Cherry Pop mixed with Juicy Orange." },
+    { emoji: "🥕", name: "Carrot",     target: "#C63D0F", hint: "Try Cherry Pop and Juicy Orange, darkened with a touch of Midnight." },
+    { emoji: "🥑", name: "Avocado",    target: "#33691E", hint: "Try Leafy darkened with lots of Midnight." },
+    { emoji: "🥦", name: "Broccoli",   target: "#1B5E20", hint: "Try Leafy with lots of Midnight." },
+    { emoji: "🍇", name: "Grapes",     target: "#4E178E", hint: "Try Grape Soda with a touch of Ocean Splash." },
+    { emoji: "🫐", name: "Blueberry",  target: "#283593", hint: "Try Ocean Splash mixed with Grape Soda." },
+    { emoji: "🍓", name: "Strawberry", target: "#C2185B", hint: "Try Cherry Pop mixed with Grape Soda." },
+    { emoji: "🍒", name: "Cherries",   target: "#880E4F", hint: "Try Cherry Pop and Grape Soda, darkened with Midnight." },
+    { emoji: "🍉", name: "Watermelon", target: "#D81B60", hint: "Try Bubblegum with some Cherry Pop." },
+    { emoji: "🍆", name: "Eggplant",   target: "#4527A0", hint: "Try Grape Soda mixed with Ocean Splash." }
+];
+
+var PASS_SCORE = 90;
+
+// ---------- Helpers ----------
+function hexToRgb(hex) {
+    hex = hex.replace("#", "");
+    return [parseInt(hex.substr(0, 2), 16), parseInt(hex.substr(2, 2), 16), parseInt(hex.substr(4, 2), 16)];
+}
+function rgbToHex(rgb) {
+    function p(n) { n = Math.max(0, Math.min(255, Math.round(n))); var s = n.toString(16); return s.length === 1 ? "0" + s : s; }
+    return ("#" + p(rgb[0]) + p(rgb[1]) + p(rgb[2])).toUpperCase();
+}
+function accuracy(targetRgb, mixRgb) {
+    var d = Math.sqrt(
+        Math.pow(targetRgb[0] - mixRgb[0], 2) +
+        Math.pow(targetRgb[1] - mixRgb[1], 2) +
+        Math.pow(targetRgb[2] - mixRgb[2], 2)
+    );
+    return Math.max(0, Math.min(100, Math.round(100 * (1 - d / 441.673))));
+}
+
+// ---------- Progress (saved locally, safe if storage is blocked) ----------
+var store = {
+    read: function () {
+        try {
+            var raw = localStorage.getItem("colorMixMatchProgress");
+            return raw ? JSON.parse(raw) : { unlocked: 1, passed: {} };
+        } catch (e) { return { unlocked: 1, passed: {} }; }
+    },
+    write: function (data) {
+        try { localStorage.setItem("colorMixMatchProgress", JSON.stringify(data)); } catch (e) {}
+    }
+};
+var progress = store.read();
+
+// ---------- State ----------
+var currentLevel = 0;
+var selectedPaint = 2; // Cherry Pop
+var mixRgb = null;     // running weighted average of dabs
+var mixWeight = 0;
+var painting = false;
+var lastPoint = null;
+var passedThisLevel = false;
+
+// ---------- DOM ----------
+var canvas = document.getElementById("canvas");
+var ctx = canvas.getContext("2d");
+var targetEmoji = document.getElementById("targetEmoji");
+var targetName = document.getElementById("targetName");
+var targetLevel = document.getElementById("targetLevel");
+var targetDisc = document.getElementById("targetDisc");
+var mixDisc = document.getElementById("mixDisc");
+var mixHex = document.getElementById("mixHex");
+var paletteEl = document.getElementById("palette");
+var levelsEl = document.getElementById("levels");
+var resultEl = document.getElementById("result");
+var resultPct = document.getElementById("resultPct");
+var resultVerdict = document.getElementById("resultVerdict");
+var resultCompare = document.getElementById("resultCompare");
+var resultNote = document.getElementById("resultNote");
+var hintText = document.getElementById("hintText");
+var nextBtn = document.getElementById("nextBtn");
+var checkBtn = document.getElementById("checkBtn");
+
+function buildPalette() {
+    paletteEl.innerHTML = "";
+    PAINTS.forEach(function (paint, i) {
+        var b = document.createElement("button");
+        b.className = "paint" + (i === selectedPaint ? " selected" : "");
+        b.type = "button";
+        b.setAttribute("aria-label", "Paint: " + paint.name);
+        b.innerHTML = '<div class="swatch" style="background:' + paint.hex + '"></div>' +
+                      '<div class="pname">' + paint.name + '</div>';
+        b.addEventListener("click", function () {
+            selectedPaint = i;
+            buildPalette();
+        });
+        paletteEl.appendChild(b);
+    });
+}
+
+function buildLevels() {
+    levelsEl.innerHTML = "";
+    LEVELS.forEach(function (level, i) {
+        var b = document.createElement("button");
+        var locked = i >= progress.unlocked;
+        var passed = !!progress.passed[i];
+        b.className = "lvl" + (i === currentLevel ? " active" : "") +
+                      (passed ? " passed" : "") + (locked ? " locked" : "");
+        b.type = "button";
+        b.textContent = level.emoji;
+        var num = document.createElement("small");
+        num.textContent = (i + 1);
+        b.appendChild(num);
+        b.setAttribute("aria-label", "Level " + (i + 1) + ": " + level.name + (locked ? " (locked)" : ""));
+        if (!locked) {
+            b.addEventListener("click", function () { loadLevel(i); });
+        }
+        levelsEl.appendChild(b);
+    });
+}
+
+function updateMixDisc() {
+    if (mixRgb === null) {
+        mixDisc.style.background = "#ffffff";
+        mixHex.textContent = "paint to start";
+    } else {
+        mixDisc.style.background = rgbToHex(mixRgb);
+        mixHex.textContent = rgbToHex(mixRgb);
+    }
+}
+
+function clearCanvas() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    mixRgb = null;
+    mixWeight = 0;
+    passedThisLevel = false;
+    updateMixDisc();
+    resultEl.classList.remove("show");
+    nextBtn.style.display = "none";
+}
+
+function loadLevel(i) {
+    currentLevel = i;
+    var level = LEVELS[i];
+    targetEmoji.textContent = level.emoji;
+    targetName.textContent = level.name;
+    targetLevel.textContent = "Level " + (i + 1) + " of " + LEVELS.length;
+    targetDisc.style.background = level.target;
+    hintText.textContent = "";
+    clearCanvas();
+    buildLevels();
+}
+
+function addDab(x, y) {
+    var paintRgb = hexToRgb(PAINTS[selectedPaint].hex);
+    if (mixRgb === null) {
+        mixRgb = paintRgb.slice();
+        mixWeight = 1;
+    } else {
+        mixWeight += 1;
+        for (var c = 0; c < 3; c++) {
+            mixRgb[c] = mixRgb[c] + (paintRgb[c] - mixRgb[c]) / mixWeight;
+        }
+    }
+    // Soft paint blob in the current mix color.
+    var r = 26;
+    var g = ctx.createRadialGradient(x, y, 2, x, y, r);
+    var hex = rgbToHex(mixRgb);
+    g.addColorStop(0, hex);
+    g.addColorStop(0.75, hex);
+    g.addColorStop(1, hex + "00");
+    ctx.globalAlpha = 0.95;
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    updateMixDisc();
+}
+
+function canvasPoint(e) {
+    var rect = canvas.getBoundingClientRect();
+    return {
+        x: (e.clientX - rect.left) * (canvas.width / rect.width),
+        y: (e.clientY - rect.top) * (canvas.height / rect.height)
+    };
+}
+
+canvas.addEventListener("pointerdown", function (e) {
+    e.preventDefault();
+    painting = true;
+    canvas.setPointerCapture(e.pointerId);
+    var p = canvasPoint(e);
+    lastPoint = p;
+    addDab(p.x, p.y);
+});
+canvas.addEventListener("pointermove", function (e) {
+    if (!painting) return;
+    var p = canvasPoint(e);
+    if (!lastPoint) { lastPoint = p; }
+    var dx = p.x - lastPoint.x, dy = p.y - lastPoint.y;
+    var dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < 9) return;
+    var steps = Math.floor(dist / 9);
+    for (var s = 1; s <= steps; s++) {
+        addDab(lastPoint.x + dx * s / steps, lastPoint.y + dy * s / steps);
+    }
+    lastPoint = p;
+});
+function stopPainting() { painting = false; lastPoint = null; }
+canvas.addEventListener("pointerup", stopPainting);
+canvas.addEventListener("pointercancel", stopPainting);
+canvas.addEventListener("pointerleave", stopPainting);
+
+document.getElementById("clearBtn").addEventListener("click", function () {
+    clearCanvas();
+    hintText.textContent = "";
+});
+
+document.getElementById("hintBtn").addEventListener("click", function () {
+    hintText.textContent = "💡 " + LEVELS[currentLevel].hint;
+});
+
+checkBtn.addEventListener("click", function () {
+    if (mixRgb === null) {
+        hintText.textContent = "Paint on the canvas first, then check!";
+        return;
+    }
+    var level = LEVELS[currentLevel];
+    var score = accuracy(hexToRgb(level.target), mixRgb);
+    resultPct.textContent = score + "%";
+    resultCompare.innerHTML =
+        '<div><div class="disc" style="background:' + level.target + '"></div><div class="disc-label">Target</div></div>' +
+        '<div class="vs">VS</div>' +
+        '<div><div class="disc" style="background:' + rgbToHex(mixRgb) + '"></div><div class="disc-label">Your mix</div></div>';
+    if (score >= PASS_SCORE) {
+        resultVerdict.textContent = "🎉 You nailed it! " + level.name + " matched!";
+        resultNote.textContent = "You can see your color next to the target. They look the same!";
+        resultEl.style.background = "#e8f5e9";
+        if (!progress.passed[currentLevel]) {
+            progress.passed[currentLevel] = true;
+            progress.unlocked = Math.max(progress.unlocked, Math.min(LEVELS.length, currentLevel + 2));
+            store.write(progress);
+        }
+        passedThisLevel = true;
+        nextBtn.style.display = "inline-block";
+        nextBtn.textContent = currentLevel + 1 < LEVELS.length ? "Next object →" : "★ Play again ↺";
+        playChime();
+        buildLevels();
+    } else if (score >= 80) {
+        resultVerdict.textContent = "So close! Just a tiny tweak.";
+        resultNote.textContent = "Add a little more of one paint and check again. Your canvas stays as it is, keep fine-tuning!";
+        resultEl.style.background = "#fff8e1";
+        nextBtn.style.display = "none";
+    } else if (score >= 60) {
+        resultVerdict.textContent = "Getting there! Keep mixing.";
+        resultNote.textContent = "Look at the two colors side by side. What is missing: darker, lighter, redder, bluer?";
+        resultEl.style.background = "#fff8e1";
+        nextBtn.style.display = "none";
+    } else {
+        resultVerdict.textContent = "Keep experimenting!";
+        resultNote.textContent = "Try different paints. The Hint button can help. You can also start over.";
+        resultEl.style.background = "#fce4ec";
+        nextBtn.style.display = "none";
+    }
+    resultEl.classList.add("show");
+    resultEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+});
+
+nextBtn.addEventListener("click", function () {
+    if (currentLevel + 1 < LEVELS.length) {
+        loadLevel(currentLevel + 1);
+    } else {
+        loadLevel(0);
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+});
+
+function playChime() {
+    try {
+        var AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+        var ac = new AC();
+        [523.25, 659.25, 783.99, 1046.5].forEach(function (freq, i) {
+            var o = ac.createOscillator();
+            var g = ac.createGain();
+            o.type = "sine";
+            o.frequency.value = freq;
+            g.gain.setValueAtTime(0.0001, ac.currentTime + i * 0.09);
+            g.gain.exponentialRampToValueAtTime(0.18, ac.currentTime + i * 0.09 + 0.03);
+            g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + i * 0.09 + 0.35);
+            o.connect(g);
+            g.connect(ac.destination);
+            o.start(ac.currentTime + i * 0.09);
+            o.stop(ac.currentTime + i * 0.09 + 0.4);
+        });
+    } catch (e) {}
+}
+
+// ---------- Start ----------
+buildPalette();
+loadLevel(0);
+</script>
+</body>
+</html>
